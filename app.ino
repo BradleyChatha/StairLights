@@ -1,4 +1,5 @@
 #include <FastLED.h>
+#include <LowPower.h>
 
 #include "defines.hpp"
 #include "globals.hpp"
@@ -11,7 +12,7 @@
 void setup()
 {
     // Setup pins.
-	pinMode(LED_STRIP_PIN,            OUTPUT);
+    pinMode(LED_STRIP_PIN,            OUTPUT);
     pinMode(MOTION_SENSOR_BOTTOM_PIN, INPUT);
     pinMode(MOTION_SENSOR_TOP_PIN,    INPUT);
 
@@ -116,6 +117,13 @@ void doStateMachine()
         if(Globals::lightState.stateLastTick == LightStateState::On)
             LED::setAll(CRGB(0));
 
+        // Sleep (to conserve power) until one of the motion sensors goes off.
+        attachInterrupt(MOTION_SENSOR_BOTTOM_PIN, nullptr, HIGH);
+        attachInterrupt(MOTION_SENSOR_TOP_PIN, nullptr, HIGH);
+        LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
+        detachInterrupt(MOTION_SENSOR_BOTTOM_PIN);
+        detachInterrupt(MOTION_SENSOR_TOP_PIN);
+        
         return;
     }
 
@@ -180,9 +188,7 @@ void loop()
     handleSensors();
     handleSerialCommands();
     handleEvents();
-    //doStateMachine();
-
-    LED::doRainbow();
+    doStateMachine();
 
 #ifdef DEBUG
     Serial.println("=====END=====");
