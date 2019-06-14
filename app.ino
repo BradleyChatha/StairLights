@@ -9,9 +9,14 @@
 // Uncomment for debugging functions.
 //#define DEBUG
 
+void onWakeup()
+{
+}
+
 void setup()
 {
     // Setup pins.
+    pinMode(LED_BUILTIN,              OUTPUT);
     pinMode(LED_STRIP_PIN,            OUTPUT);
     pinMode(MOTION_SENSOR_BOTTOM_PIN, INPUT);
     pinMode(MOTION_SENSOR_TOP_PIN,    INPUT);
@@ -92,6 +97,9 @@ void handleSerialCommands()
 
 void onMotionDetected()
 {
+    if(Globals::lightState.timer > 0)
+        return;
+
     Globals::lightState.stateLastTick = Globals::lightState.state;
     Globals::lightState.state         = LightStateState::On;
     Globals::lightState.timer         = LED_STRIP_TIME_ON_MS;
@@ -117,21 +125,21 @@ void doStateMachine()
         if(Globals::lightState.stateLastTick == LightStateState::On)
             LED::setAll(CRGB(0));
 
+        Globals::lightState.stateLastTick = LightStateState::Off;
+
         // Sleep (to conserve power) until one of the motion sensors goes off.
-        attachInterrupt(MOTION_SENSOR_BOTTOM_PIN, nullptr, HIGH);
-        attachInterrupt(MOTION_SENSOR_TOP_PIN, nullptr, HIGH);
+        attachInterrupt(0, &onWakeup, CHANGE);
         LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
-        detachInterrupt(MOTION_SENSOR_BOTTOM_PIN);
-        detachInterrupt(MOTION_SENSOR_TOP_PIN);
-        
+        detachInterrupt(0);
+
         return;
     }
 
     if(Globals::lightState.state == LightStateState::On)
     {
         digitalWrite(LED_BUILTIN, HIGH);
-        if(Globals::lightState.stateLastTick == LightStateState::Off)
-            LED::setAll(CRGB(128, 128, 128));
+        if(Globals::lightState.stateLastTick == LightStateState::Off){}
+            //LED::setAll(CRGB(128, 128, 128));
 
         Globals::lightState.timer -= Globals::deltaTimeMS;
 
@@ -139,7 +147,13 @@ void doStateMachine()
         {
             Globals::lightState.stateLastTick = Globals::lightState.state;
             Globals::lightState.state         = LightStateState::Off;
+
+            // Keep them black for a bit, so the PIR sensor doesn't instantly retrigger from the light level changing.
+            LED::setAll(CRGB(0, 0, 0));
+            LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
         }
+
+        LED::doRainbow();
     }
 }
 
@@ -157,6 +171,14 @@ void doDebugPrint()
         Serial.print("\tTimer: ");
         Serial.println(Globals::lightState.timer);
     Serial.println("}");
+
+    Serial.println("Sensors: [");
+        Serial.print("MOTION_TOP: ");
+        Serial.println(Globals::motionStates[MOTION_SENSOR_TOP_INDEX]);
+
+        Serial.print("MOTION_BOT: ");
+        Serial.println(Globals::motionStates[MOTION_SENSOR_BOTTOM_INDEX]);
+    Serial.println("]");
 
     Serial.print("LEDs: [");
         for(uint16_t i = 0; i < LED_STRIP_LEDS; i++)
@@ -177,18 +199,16 @@ void doDebugPrint()
 
 void loop()
 {
-    //Serial.println(digitalRead(MOTION_SENSOR_TOP_PIN));
-
 #ifdef DEBUG
     Serial.println("=====START=====");
     doDebugPrint();
 #endif
 
     handleDeltaTime();
-    handleSensors();
     handleSerialCommands();
     handleEvents();
     doStateMachine();
+    handleSensors(); // Need to keep this *after* doStateMachine, otherwise the deltatime can be a bit higher than we expect.
 
 #ifdef DEBUG
     Serial.println("=====END=====");

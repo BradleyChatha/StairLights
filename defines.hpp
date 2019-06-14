@@ -20,7 +20,7 @@
 
 /**** START Misc info ****/
 #define SERIAL_COMMAND_BUFFER_SIZE 32
-#define CYCLE_DELAY_MS             200
+#define CYCLE_DELAY_MS             50
 #define RAINBOW_DELTA_HUE          5
 /**** END Misc info ****/
 
