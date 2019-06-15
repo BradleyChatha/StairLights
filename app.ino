@@ -1,13 +1,16 @@
+#define ARDUINO 101
+
+#include <NewPing.h>
 #include <FastLED.h>
 #include <LowPower.h>
+
+// Uncomment for debugging functions.
+//#define DEBUG
 
 #include "defines.hpp"
 #include "globals.hpp"
 #include "types.hpp"
 #include "led_funcs.hpp"
-
-// Uncomment for debugging functions.
-//#define DEBUG
 
 void onWakeup()
 {
@@ -16,10 +19,10 @@ void onWakeup()
 void setup()
 {
     // Setup pins.
-    pinMode(LED_BUILTIN,              OUTPUT);
-    pinMode(LED_STRIP_PIN,            OUTPUT);
-    pinMode(MOTION_SENSOR_BOTTOM_PIN, INPUT);
-    pinMode(MOTION_SENSOR_TOP_PIN,    INPUT);
+    pinMode(LED_BUILTIN,                   OUTPUT);
+    pinMode(LED_STRIP_PIN,                 OUTPUT);
+    pinMode(MOTION_SENSOR_TOP_ECHO_PING,   INPUT);
+    pinMode(MOTION_SENSOR_TOP_TRIGGER_PIN, OUTPUT);
 
     digitalWrite(LED_STRIP_PIN, 0);
 
@@ -32,6 +35,14 @@ void setup()
     // Setup FastLED.
     FastLED.addLeds<WS2812B, LED_STRIP_PIN>(Globals::leds, LED_STRIP_LEDS);
 
+    uint8_t stepsDone = 0;
+    while(!LED::doCountdown(CRGB(0, 255, 0), 1000, 5, stepsDone)) 
+    {
+    }
+
+    // Setup sensors.
+    calibrateSensor(MOTION_SENSOR_TOP_TRIGGER_PIN, MOTION_SENSOR_TOP_ECHO_PING, MOTION_SENSOR_TOP_INDEX);
+
     // Setup globals.
     Globals::deltaTimeMS              = 0;
     Globals::motionStates[0]          = false;
@@ -39,6 +50,12 @@ void setup()
     Globals::lightState.state         = LightStateState::Off;
     Globals::lightState.stateLastTick = LightStateState::Off;
     Globals::lightState.timer         = 0;
+    Globals::lightingFuncs[0]         = &lightingRainbow;
+    Globals::lightingFuncs[1]         = &lightingStepping;
+
+#ifdef DEBUG
+    Serial.println("Finished Setup");
+#endif
 }
 
 void handleDeltaTime()
@@ -54,10 +71,111 @@ void handleDeltaTime()
     prevTime = currTime;
 }
 
+void calibrateSensor(int triggerPin, int echoPin, int sensorIndex)
+{
+#ifdef DEBUG
+    Serial.print("Calibrating ");
+    Serial.print(triggerPin);
+    Serial.print(", ");
+    Serial.print(echoPin);
+    Serial.print(", ");
+    Serial.println(sensorIndex);
+#endif
+
+    Globals::sensors[sensorIndex] = NewPing(triggerPin, echoPin);
+
+    const uint8_t TOTAL_STEPS = CALIBRATION_TIME_MS / 1000;
+    uint8_t stepsDone = 0;
+    Calibration calib;
+    calib.normalLower = 0;
+    calib.normalHigher = 0;
+
+    while(!LED::doCountdown(CRGB(255, 0, 0), 1000, TOTAL_STEPS, stepsDone))
+    {
+        unsigned long reading = Globals::sensors[sensorIndex].ping_cm();
+
+        LED::showBinary(TOTAL_STEPS + 1, CRGB(0, 0, 255), (uint16_t)reading);
+        delay(2000);
+
+        if(reading == NO_ECHO)
+        {
+            if(stepsDone > 0)
+                stepsDone--;
+
+            flushSensor(echoPin);
+        }
+
+        if(calib.normalLower == 0 || reading < calib.normalLower)
+            calib.normalLower = reading;
+
+        if(reading > calib.normalHigher)
+            calib.normalHigher = reading;
+
+#ifdef DEBUG
+        Serial.print("READING #");
+        Serial.print(stepsDone);
+        Serial.print(": R=");
+        Serial.print(reading);
+        Serial.print(", L=");
+        Serial.print(calib.normalLower);
+        Serial.print(", H=");
+        Serial.println(calib.normalHigher);
+#endif
+    }
+
+    LED::showBinary(0, CRGB(255, 0, 255), calib.normalLower);
+    LED::showBinary(17, CRGB(0, 0, 255), calib.normalHigher);
+    delay(5000);
+    LED::setAll(CRGB(0));
+
+    Globals::calibration[sensorIndex] = calib;
+
+#ifdef DEBUG
+    Serial.println("Done Calibrating.");
+#endif
+}
+
+void flushSensor(int echoPin)
+{
+    pinMode(echoPin, OUTPUT);
+    digitalWrite(echoPin, HIGH);
+    delay(200);
+    digitalWrite(echoPin, LOW);
+    delay(200);
+    pinMode(echoPin, INPUT);
+}
+
 void handleSensors()
 {
-    Globals::motionStates[MOTION_SENSOR_BOTTOM_INDEX] = (digitalRead(MOTION_SENSOR_BOTTOM_PIN) > 0);
-    Globals::motionStates[MOTION_SENSOR_TOP_INDEX]    = (digitalRead(MOTION_SENSOR_TOP_PIN) > 0);
+    if(Globals::lightState.state != LightStateState::Off)
+        return;
+
+    for(int i = 0; i < MOTION_SENSOR_COUNT; i++)
+    {
+        unsigned long reading = Globals::sensors[i].ping_cm();
+
+        LED::showBinary(5, CRGB(255, 255, 255), reading);
+        delay(1000);
+
+        if(reading == NO_ECHO)
+        {
+            flushSensor(MOTION_SENSOR_TOP_ECHO_PING);
+            continue;
+        }
+
+        Globals::motionStates[i] = (reading < Globals::calibration[i].getTriggerThreshold());
+
+#ifdef DEBUG
+        Serial.print("Sensor #");
+        Serial.print(i);
+        Serial.print(": R=");
+        Serial.print(reading);
+        Serial.print(", T=");
+        Serial.println(Globals::calibration[i].getTriggerThreshold());
+#endif
+    }
+
+    LED::setAll(CRGB(0));
 }
 
 // Serial commands are used for debugging.
@@ -85,8 +203,6 @@ void handleSerialCommands()
     // Execute it
     if(strcmp(buffer, "settop") == 0)
         Globals::motionStates[MOTION_SENSOR_TOP_INDEX] = true;
-    else if(strcmp(buffer, "setbot") == 0)
-        Globals::motionStates[MOTION_SENSOR_BOTTOM_INDEX] = true;
     else if(i > 0) // See this as an 'else' statement.
     {
         Serial.print("Unknown command: ");
@@ -97,12 +213,11 @@ void handleSerialCommands()
 
 void onMotionDetected()
 {
-    if(Globals::lightState.timer > 0)
+    if(Globals::lightState.state != LightStateState::Off)
         return;
 
-    Globals::lightState.stateLastTick = Globals::lightState.state;
-    Globals::lightState.state         = LightStateState::On;
-    Globals::lightState.timer         = LED_STRIP_TIME_ON_MS;
+    Globals::lightState.state = LightStateState::Starting;
+    Globals::lightState.timer = LED_STRIP_TIME_ON_MS; // Timer doesn't start until we're in the "On"/"Step" state.
 }
 
 void handleEvents()
@@ -119,41 +234,53 @@ void handleEvents()
 
 void doStateMachine()
 {
-    if(Globals::lightState.state == LightStateState::Off)
+    static LightingFunc selectedFunc = nullptr;
+
+    switch(Globals::lightState.state)
     {
-        digitalWrite(LED_BUILTIN, LOW);
-        if(Globals::lightState.stateLastTick == LightStateState::On)
+        case LightStateState::Off:
+            digitalWrite(LED_BUILTIN, LOW);
             LED::setAll(CRGB(0));
 
-        Globals::lightState.stateLastTick = LightStateState::Off;
+            // Sleep (to conserve power) before we check again.
+#ifndef DEBUG
+            LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF);
+#endif
+            break;
 
-        // Sleep (to conserve power) until one of the motion sensors goes off.
-        attachInterrupt(0, &onWakeup, CHANGE);
-        LowPower.powerDown(SLEEP_FOREVER, ADC_OFF, BOD_OFF);
-        detachInterrupt(0);
+        case LightStateState::Starting:
+            if(selectedFunc == nullptr)
+                selectedFunc = Globals::lightingFuncs[random(0, LIGHTING_FUNCS_COUNT)];
 
-        return;
-    }
+            if(selectedFunc(LightingFuncState::Start)) // True = starting animation is done.
+                Globals::lightState.state = LightStateState::On;
+            break;
 
-    if(Globals::lightState.state == LightStateState::On)
-    {
-        digitalWrite(LED_BUILTIN, HIGH);
-        if(Globals::lightState.stateLastTick == LightStateState::Off){}
-            //LED::setAll(CRGB(128, 128, 128));
+        case LightStateState::On:
+            digitalWrite(LED_BUILTIN, HIGH);
 
-        Globals::lightState.timer -= Globals::deltaTimeMS;
+            Globals::lightState.timer -= Globals::deltaTimeMS;
+            selectedFunc(LightingFuncState::Step);
 
-        if(Globals::lightState.timer <= 0)
-        {
-            Globals::lightState.stateLastTick = Globals::lightState.state;
-            Globals::lightState.state         = LightStateState::Off;
+            if(Globals::lightState.timer <= 0)
+                Globals::lightState.state = LightStateState::Ending;
+            break;
 
-            // Keep them black for a bit, so the PIR sensor doesn't instantly retrigger from the light level changing.
-            LED::setAll(CRGB(0, 0, 0));
-            LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
-        }
+        case LightStateState::Ending:
+            if(selectedFunc(LightingFuncState::End)) // True = starting animation is done.
+            {
+                selectedFunc = nullptr;
+                Globals::lightState.state = LightStateState::Off;
+#ifndef DEBUG
+                LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF);
+#endif
+                LED::setAll(CRGB(0));
+            }
 
-        LED::doRainbow();
+            break;
+
+        default:
+            break;
     }
 }
 
@@ -175,9 +302,6 @@ void doDebugPrint()
     Serial.println("Sensors: [");
         Serial.print("MOTION_TOP: ");
         Serial.println(Globals::motionStates[MOTION_SENSOR_TOP_INDEX]);
-
-        Serial.print("MOTION_BOT: ");
-        Serial.println(Globals::motionStates[MOTION_SENSOR_BOTTOM_INDEX]);
     Serial.println("]");
 
     Serial.print("LEDs: [");
@@ -217,4 +341,48 @@ void loop()
 #endif
 
     delay(CYCLE_DELAY_MS);
+}
+
+/* LIGHTING FUNCTIONS */
+bool lightingRainbow(LightingFuncState state)
+{
+    if(state == LightingFuncState::Start)
+        return true;
+
+    if(state == LightingFuncState::Step)
+    {
+        LED::doRainbow();
+        return false; // Doesn't matter for this state.
+    }
+
+    if(state == LightingFuncState::End)
+    {
+        LED::doRainbow();
+        return LED::doFadeout();
+    }
+
+    return false;
+}
+
+bool lightingStepping(LightingFuncState state)
+{
+    if(state == LightingFuncState::Start)
+    {
+        FastLED.setBrightness(128);
+        return LED::doStepdownAnimation(CRGB(128, 128, 128));
+    }
+
+    if(state == LightingFuncState::Step)
+        return false;
+
+    if(state == LightingFuncState::End)
+    {
+        bool done = LED::doStepupAnimation(CRGB(0, 0, 0));
+        if(done)
+            FastLED.setBrightness(255);
+
+        return done;
+    }
+
+    return false;
 }
