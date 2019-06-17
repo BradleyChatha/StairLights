@@ -52,6 +52,7 @@ namespace Globals {
     extern unsigned long             deltaTimeMS; // Measured in ms
     extern LightStateInfo            lightState;
     extern LightingFunc              lightingFuncs[LIGHTING_FUNCS_COUNT];
+    extern unsigned long             randomSeed; // Will only be used at *The end of the setup function*
 };
 
 #endif

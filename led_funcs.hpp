@@ -18,7 +18,7 @@ namespace LED
     {
         const int NumTBits = sizeof(NumT) * 8;
         for(int bit = 0; bit < NumTBits; bit++)
-            Globals::leds[startLED + bit] = (num & ((1 << (NumTBits - 1)) >> bit)) > 0 ? colour : CRGB(0);
+            Globals::leds[startLED + bit] = (num & (1 << (NumTBits - (bit + 1)))) > 0 ? colour : CRGB(0);
         Globals::leds[startLED + NumTBits] = CRGB(255, 0, 0);
         FastLED.show();
     }

@@ -56,6 +56,15 @@ void setup()
 #ifdef DEBUG
     Serial.println("Finished Setup");
 #endif
+
+    // Make the random seed a bit more random, by reading from a floating analog input.
+    for(int i = 0; i < 1000 / 50; i++)
+    {
+        delay(50);
+        Globals::randomSeed += analogRead(A0);
+    }
+
+    randomSeed(Globals::randomSeed);
 }
 
 void handleDeltaTime()
@@ -93,8 +102,9 @@ void calibrateSensor(int triggerPin, int echoPin, int sensorIndex)
     while(!LED::doCountdown(CRGB(255, 0, 0), 1000, TOTAL_STEPS, stepsDone))
     {
         unsigned long reading = Globals::sensors[sensorIndex].ping_cm();
+        Globals::randomSeed += reading; // So we can be a bit more random about things.
 
-        LED::showBinary(TOTAL_STEPS + 1, CRGB(0, 0, 255), (uint16_t)reading);
+        LED::showBinary(TOTAL_STEPS + 1, CRGB(0, 0, 255), reading);
         delay(2000);
 
         if(reading == NO_ECHO)
@@ -122,9 +132,10 @@ void calibrateSensor(int triggerPin, int echoPin, int sensorIndex)
         Serial.println(calib.normalHigher);
 #endif
     }
-
+    
+    LED::setAll(CRGB(0));
     LED::showBinary(0, CRGB(255, 0, 255), calib.normalLower);
-    LED::showBinary(17, CRGB(0, 0, 255), calib.normalHigher);
+    LED::showBinary(65, CRGB(0, 0, 255), calib.normalHigher);
     delay(5000);
     LED::setAll(CRGB(0));
 
@@ -154,9 +165,6 @@ void handleSensors()
     {
         unsigned long reading = Globals::sensors[i].ping_cm();
 
-        LED::showBinary(5, CRGB(255, 255, 255), reading);
-        delay(1000);
-
         if(reading == NO_ECHO)
         {
             flushSensor(MOTION_SENSOR_TOP_ECHO_PING);
@@ -175,7 +183,7 @@ void handleSensors()
 #endif
     }
 
-    LED::setAll(CRGB(0));
+    LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF);
 }
 
 // Serial commands are used for debugging.
@@ -271,10 +279,10 @@ void doStateMachine()
             {
                 selectedFunc = nullptr;
                 Globals::lightState.state = LightStateState::Off;
+                LED::setAll(CRGB(0));
 #ifndef DEBUG
                 LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF);
 #endif
-                LED::setAll(CRGB(0));
             }
 
             break;

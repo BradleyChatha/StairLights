@@ -7,3 +7,4 @@ Calibration Globals::calibration[MOTION_SENSOR_COUNT];
 NewPing Globals::sensors[MOTION_SENSOR_COUNT] = { NewPing(0, 0) };
 unsigned long Globals::deltaTimeMS;
 LightStateInfo Globals::lightState;
+unsigned long Globals::randomSeed;
