@@ -58,6 +58,7 @@ void setup()
 #endif
 
     // Make the random seed a bit more random, by reading from a floating analog input.
+    pinMode(A0, INPUT);
     for(int i = 0; i < 1000 / 50; i++)
     {
         delay(50);
@@ -168,6 +169,7 @@ void handleSensors()
         if(reading == NO_ECHO)
         {
             flushSensor(MOTION_SENSOR_TOP_ECHO_PING);
+            Globals::motionStates[i] = false;
             continue;
         }
 
