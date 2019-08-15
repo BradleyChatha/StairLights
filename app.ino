@@ -100,13 +100,20 @@ void calibrateSensor(int triggerPin, int echoPin, int sensorIndex)
     calib.normalLower = 0;
     calib.normalHigher = 0;
 
-    while(!LED::doCountdown(CRGB(255, 0, 0), 1000, TOTAL_STEPS, stepsDone))
+    while(!LED::doCountdown(CRGB(255, 0, 0), 600, TOTAL_STEPS, stepsDone))
     {
+        // Turn LEDs off so more power can go to the sensor (as they're on the same power line).
+        LED::setAll(CRGB(0));
+        delay(200);
+
         unsigned long reading = Globals::sensors[sensorIndex].ping_cm();
         Globals::randomSeed += reading; // So we can be a bit more random about things.
 
-        LED::showBinary(TOTAL_STEPS + 1, CRGB(0, 0, 255), reading);
-        delay(2000);
+        // Re-light the countdown LEDs, and show the debug LEDs.
+        for(int i = 0; i < (TOTAL_STEPS - stepsDone); i++)
+            Globals::leds[i] = CRGB(255, 0, 0);
+        LED::showBinary(TOTAL_STEPS + 1, CRGB(0, 0, 255), (uint16_t)reading);
+        delay(200);
 
         if(reading == NO_ECHO)
         {
@@ -135,8 +142,8 @@ void calibrateSensor(int triggerPin, int echoPin, int sensorIndex)
     }
     
     LED::setAll(CRGB(0));
-    LED::showBinary(0, CRGB(255, 0, 255), calib.normalLower);
-    LED::showBinary(65, CRGB(0, 0, 255), calib.normalHigher);
+    LED::showBinary(0, CRGB(255, 0, 255), (uint16_t)calib.normalLower);
+    LED::showBinary(17, CRGB(0, 0, 255), (uint16_t)calib.normalHigher);
     delay(5000);
     LED::setAll(CRGB(0));
 
@@ -151,10 +158,11 @@ void flushSensor(int echoPin)
 {
     pinMode(echoPin, OUTPUT);
     digitalWrite(echoPin, HIGH);
-    delay(200);
+    delay(20);
     digitalWrite(echoPin, LOW);
-    delay(200);
+    delay(20);
     pinMode(echoPin, INPUT);
+    delay(20);
 }
 
 void handleSensors()
@@ -184,8 +192,6 @@ void handleSensors()
         Serial.println(Globals::calibration[i].getTriggerThreshold());
 #endif
     }
-
-    LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF);
 }
 
 // Serial commands are used for debugging.
@@ -254,7 +260,7 @@ void doStateMachine()
 
             // Sleep (to conserve power) before we check again.
 #ifndef DEBUG
-            LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF);
+            LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF);
 #endif
             break;
 
@@ -282,9 +288,6 @@ void doStateMachine()
                 selectedFunc = nullptr;
                 Globals::lightState.state = LightStateState::Off;
                 LED::setAll(CRGB(0));
-#ifndef DEBUG
-                LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF);
-#endif
             }
 
             break;
