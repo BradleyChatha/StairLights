@@ -2,7 +2,7 @@
 #define GLOBALS_H
 
 #include <FastLED.h>
-#include <NewPing.h>
+#include <Ultrasonic.h>
 #include "defines.hpp"
 #include "types.hpp"
 
@@ -47,7 +47,7 @@ struct Calibration
 namespace Globals {
     extern bool                      motionStates[MOTION_SENSOR_COUNT]; // 0 = Not triggered. 1 = Triggered.
     extern Calibration               calibration[MOTION_SENSOR_COUNT];
-    extern NewPing                   sensors[MOTION_SENSOR_COUNT];
+    extern Ultrasonic                sensors[MOTION_SENSOR_COUNT];
     extern CRGB                      leds[LED_STRIP_LEDS];
     extern unsigned long             deltaTimeMS; // Measured in ms
     extern LightStateInfo            lightState;

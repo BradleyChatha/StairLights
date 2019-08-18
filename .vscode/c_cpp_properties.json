@@ -3,7 +3,7 @@
         {
             "name": "Win32",
             "includePath": [
-                "C:\\Users\\Sealab\\Documents\\Arduino\\libraries\\NewPing\\src",
+                "C:\\Users\\Sealab\\Documents\\Arduino\\libraries\\Ultrasonic\\src",
                 "C:\\Users\\Sealab\\Documents\\Arduino\\libraries\\Low-Power",
                 "C:\\Users\\Sealab\\Documents\\Arduino\\libraries\\FastLED",
                 "G:/None-Game/Arduino IDE/tools/**/*",

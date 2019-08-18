@@ -1,6 +1,6 @@
 #define ARDUINO 101
 
-#include <NewPing.h>
+#include <Ultrasonic.h>
 #include <FastLED.h>
 #include <LowPower.h>
 
@@ -92,7 +92,7 @@ void calibrateSensor(int triggerPin, int echoPin, int sensorIndex)
     Serial.println(sensorIndex);
 #endif
 
-    Globals::sensors[sensorIndex] = NewPing(triggerPin, echoPin);
+    Globals::sensors[sensorIndex] = Ultrasonic(triggerPin, echoPin);
 
     const uint8_t TOTAL_STEPS = CALIBRATION_TIME_MS / 1000;
     uint8_t stepsDone = 0;
@@ -106,7 +106,7 @@ void calibrateSensor(int triggerPin, int echoPin, int sensorIndex)
         LED::setAll(CRGB(0));
         delay(200);
 
-        unsigned long reading = Globals::sensors[sensorIndex].ping_cm();
+        unsigned long reading = Globals::sensors[sensorIndex].read();
         Globals::randomSeed += reading; // So we can be a bit more random about things.
 
         // Re-light the countdown LEDs, and show the debug LEDs.
@@ -115,7 +115,7 @@ void calibrateSensor(int triggerPin, int echoPin, int sensorIndex)
         LED::showBinary(TOTAL_STEPS + 1, CRGB(0, 0, 255), (uint16_t)reading);
         delay(200);
 
-        if(reading == NO_ECHO)
+        if(reading <= 0)
         {
             if(stepsDone > 0)
                 stepsDone--;
@@ -172,9 +172,9 @@ void handleSensors()
 
     for(int i = 0; i < MOTION_SENSOR_COUNT; i++)
     {
-        unsigned long reading = Globals::sensors[i].ping_cm();
+        unsigned long reading = Globals::sensors[i].read();
 
-        if(reading == NO_ECHO)
+        if(reading <= 0)
         {
             flushSensor(MOTION_SENSOR_TOP_ECHO_PING);
             Globals::motionStates[i] = false;
