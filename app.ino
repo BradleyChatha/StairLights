@@ -18,8 +18,8 @@ void onWakeup()
 void setup()
 {
     // Setup pins.
-    pinMode(LED_BUILTIN,                   OUTPUT);
-    pinMode(LED_STRIP_PIN,                 OUTPUT);
+    pinMode(LED_BUILTIN,   OUTPUT);
+    pinMode(LED_STRIP_PIN, OUTPUT);
 
     digitalWrite(LED_STRIP_PIN, 0);
 
@@ -51,11 +51,16 @@ void setup()
         delay(50);
         Globals::randomSeed += analogRead(A0);
     }
+    pinMode(A0, OUTPUT);
 
     randomSeed(Globals::randomSeed);
 
     // Just to make sure all the wiring is ok, and to get a visualisation of the seed.
     LED::setAll(CRGB(Globals::randomSeed % 255, 128, 128));
+    delay(2000);
+    LED::setAll(CRGB(0));
+
+    FastLED.setMaxPowerInVoltsAndMilliamps(LED_STRIP_MAX_VOLTS, LED_STRIP_MAX_mAMPS);
 }
 
 void handleDeltaTime()
@@ -75,12 +80,20 @@ void doStateMachine()
 {
     static LightingFunc selectedFunc = nullptr;
 
+    #ifdef DEBUG
+    Serial.print("state: ");
+    Serial.println((int)Globals::lightState.state);
+    Serial.print("timer: ");
+    Serial.println(Globals::lightState.timer);
+    Serial.println();
+    #endif
+
     switch(Globals::lightState.state)
     {
         case LightStateState::Resting:
             Globals::lightState.timer -= Globals::deltaTimeMS;
 
-            if(Globals::deltaTimeMS <= 0)
+            if(Globals::lightState.timer <= 0)
             {
                 Globals::lightState.state = LightStateState::Starting;
                 Globals::lightState.timer = LED_STRIP_TIME_ON_MS;
@@ -119,7 +132,8 @@ void doStateMachine()
             if(selectedFunc(LightingFuncState::End)) // True = starting animation is done.
             {
                 selectedFunc = nullptr;
-                Globals::lightState.state = LightStateState::Off;
+                Globals::lightState.state = LightStateState::Resting;
+                Globals::lightState.timer = LED_STRIP_REST_MS;
                 LED::setAll(CRGB(0));
             }
 

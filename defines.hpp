@@ -5,6 +5,8 @@
 #define LED_STRIP_PIN        A0 // The data pin.
 #define LED_STRIP_TIME_ON_MS 1000 * 15 // How long the strips stay on when triggered.
 #define LED_STRIP_REST_MS    1000 * 30
+#define LED_STRIP_MAX_VOLTS  4
+#define LED_STRIP_MAX_mAMPS  (1000 * 2) + 500
 
 #ifndef DEBUG
     #define LED_STRIP_LEDS 148 // How many LEDS we're using.
