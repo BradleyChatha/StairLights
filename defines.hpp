@@ -1,6 +1,9 @@
 #ifndef DEFINES_INO
 #define DEFINES_INO
 
+// Uncomment for debugging functions.
+//#define DEBUG
+
 /**** START LED strip info ****/
 #define LED_STRIP_PIN        A0 // The data pin.
 #define LED_STRIP_TIME_ON_MS 1000 * 15 // How long the strips stay on when triggered.
@@ -22,7 +25,7 @@
 #ifndef DEBUG
     #define CYCLE_DELAY_MS 50
 #else
-    #define CYCLE_DELAY_MS 1000
+    #define CYCLE_DELAY_MS 100
 #endif
 
 #define RAINBOW_DELTA_HUE          5

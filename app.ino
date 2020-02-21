@@ -3,9 +3,6 @@
 #include <FastLED.h>
 #include <LowPower.h>
 
-// Uncomment for debugging functions.
-//#define DEBUG
-
 #include "defines.hpp"
 #include "globals.hpp"
 #include "types.hpp"
@@ -25,7 +22,7 @@ void setup()
 
     // Setup serial.
 #ifdef DEBUG
-    Serial.begin(9600);
+    Serial.begin(115200);
     while (!Serial) {;}
 #endif
 
@@ -100,19 +97,13 @@ void doStateMachine()
             }
             break;
 
-        case LightStateState::Off:
-            digitalWrite(LED_BUILTIN, LOW);
-            LED::setAll(CRGB(0));
-
-            // Sleep (to conserve power) before we check again.
-#ifndef DEBUG
-            LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF);
-#endif
-            break;
-
         case LightStateState::Starting:
             if(selectedFunc == nullptr)
                 selectedFunc = Globals::lightingFuncs[random(0, LIGHTING_FUNCS_COUNT)];
+            
+            #ifdef DEBUG
+            Serial.println((int)selectedFunc);
+            #endif
 
             if(selectedFunc(LightingFuncState::Start)) // True = starting animation is done.
                 Globals::lightState.state = LightStateState::On;
@@ -155,6 +146,10 @@ void loop()
 /* LIGHTING FUNCTIONS */
 bool lightingRainbow(LightingFuncState state)
 {
+    #ifdef DEBUG
+    Serial.println("LIGTING: RAINBOW");
+    #endif
+
     if(state == LightingFuncState::Start)
         return true;
 
@@ -175,6 +170,10 @@ bool lightingRainbow(LightingFuncState state)
 
 bool lightingStepping(LightingFuncState state)
 {
+    #ifdef DEBUG
+    Serial.println("LIGTING: STEPPING");
+    #endif
+
     if(state == LightingFuncState::Start)
     {
         FastLED.setBrightness(128);

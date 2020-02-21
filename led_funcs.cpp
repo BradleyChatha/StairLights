@@ -1,5 +1,6 @@
 #include "led_funcs.hpp"
 #include "globals.hpp"
+#include <Arduino.h>
 
 namespace LED 
 {
@@ -52,6 +53,14 @@ namespace LED
         Globals::leds[index++] = colour;
         FastLED.show();
 
+        #ifdef DEBUG
+        Serial.println("ANIMATION: STEPDOWN");
+        Serial.print("LED: ");
+        Serial.print(index);
+        Serial.print("/");
+        Serial.println(LED_STRIP_LEDS);
+        #endif
+
         if(index >= LED_STRIP_LEDS)
         {
             index = 0;
@@ -66,7 +75,7 @@ namespace LED
     {
         static int16_t index = LED_STRIP_LEDS;
 
-        Globals::leds[index--] = colour;
+        Globals::leds[--index] = colour;
         FastLED.show();
 
         if(index < 0)
